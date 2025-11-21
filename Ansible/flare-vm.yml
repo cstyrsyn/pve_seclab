@@ -1,0 +1,5 @@
+---
+- name: Make a FlareVM Host
+  hosts: windows-hosts
+  roles:
+  - flare-vm

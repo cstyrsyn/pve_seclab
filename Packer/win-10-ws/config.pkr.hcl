@@ -43,12 +43,12 @@ variable "proxmox_api_host" {
 
 variable "storage_pool" {
   type    = string
-  default = "local-lvm"
+  default = "main"
 }
 
 variable "iso_storage" {
   type    = string
-  default = "local"
+  default = "store"
 }
 
 variable "network_adapter" {
@@ -65,7 +65,7 @@ locals {
 
 variable "proxmox_node" {
   type    = string
-  default = "proxmox"
+  default = "pve"
 }
 
 source "proxmox-iso" "seclab-win-ws" {
@@ -75,7 +75,7 @@ source "proxmox-iso" "seclab-win-ws" {
   token        = "${local.proxmox_api_token}"
   boot_iso {
     type         = "sata"
-    iso_file     = "${var.iso_storage}:iso/Win-10-Enterprise.iso"
+    iso_file     = "${var.iso_storage}:iso/win10-22H2.iso"
     iso_checksum = "sha256:ef7312733a9f5d7d51cfa04ac497671995674ca5e1058d5164d6028f0938d668"
     unmount      = true
   }
@@ -118,13 +118,13 @@ source "proxmox-iso" "seclab-win-ws" {
     index        = 1
     type         = "sata"
     iso_file     = "${var.iso_storage}:iso/Autounattend-win-10-ws.iso"
-    iso_checksum = "sha256:2893ca8f6d1f420436b6c213fa618710e7689a67d4bf924263361f07cced3b34"
+    iso_checksum = "sha256:192e70da5fc4690b66ed039de7c68b08d32e931662bee3988a67900063b18c95"
   }
   additional_iso_files {
     index        = 2
     type         = "sata"
-    iso_file     = "${var.iso_storage}:iso/virtio.iso"
-    iso_checksum = "sha256:57b0f6dc8dc92dc2ae8621f8b1bfbd8a873de9bedc788c4c4b305ea28acc77cd"
+    iso_file     = "${var.iso_storage}:iso/virtio-win.iso"
+    iso_checksum = "sha256:e14cf2b94492c3e925f0070ba7fdfedeb2048c91eea9c5a5afb30232a3976331"
   }
 
   network_adapters {

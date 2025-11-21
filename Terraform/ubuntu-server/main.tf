@@ -25,6 +25,12 @@ variable "keepass_database" {
 variable "proxmox_host" {
   type        = string
   default     = "proxmox"
+  description = "Proxmox host name"
+}
+
+variable "proxmox_node" {
+  type        = string
+  default     = "pve"
   description = "Proxmox node name"
 }
 
@@ -43,6 +49,7 @@ variable "vm_name" {
 variable "template_id" {
   type        = string
   description = "Template ID for clone"
+  default     = "105"
 }
 
 provider "keepass" {
@@ -68,7 +75,7 @@ provider "proxmox" {
 
 resource "proxmox_virtual_environment_vm" "seclab-docker" {
   name      = var.vm_name
-  node_name = var.proxmox_host
+  node_name = var.proxmox_node
   on_boot   = true
 
   clone {

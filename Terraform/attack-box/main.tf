@@ -28,6 +28,12 @@ variable "proxmox_host" {
   description = "Proxmox node name"
 }
 
+variable "proxmox_node" {
+  type        = string
+  default     = "pve"
+  description = "Proxmox node name"
+}
+
 variable "hostname" {
   type        = string
   default     = "kali"
@@ -37,6 +43,7 @@ variable "hostname" {
 variable "template_id" {
   type        = string
   description = "Template ID for clone"
+  default = "106"
 }
 
 provider "keepass" {
@@ -61,7 +68,7 @@ provider "proxmox" {
 
 resource "proxmox_virtual_environment_vm" "seclab-kali" {
   name      = "Seclab-Kali"
-  node_name = var.proxmox_host
+  node_name = var.proxmox_node
   on_boot   = true
 
   clone {

@@ -43,17 +43,17 @@ variable "proxmox_api_host" {
 
 variable "proxmox_node" {
   type    = string
-  default = "proxmox"
+  default = "pve"
 }
 
 variable "storage_pool" {
   type    = string
-  default = "local-lvm"
+  default = "main"
 }
 
 variable "iso_storage" {
   type    = string
-  default = "local"
+  default = "store"
 }
 
 variable "network_adapter" {
@@ -76,8 +76,8 @@ source "proxmox-iso" "seclab-kali" {
   token       = "${local.proxmox_api_token}"
   boot_iso {
     type         = "ide"
-    iso_file     = "${iso_storage}:iso/kali.iso"
-    iso_checksum = "sha256:0b0f5560c21bcc1ee2b1fef2d8e21dca99cc6efa938a47108bbba63bec499779"
+    iso_file     = "${var.iso_storage}:iso/kali-linux-2025.3-installer-amd64.iso"
+    iso_checksum = "sha256:fcf1999799f6642b7d6c6bd79bc1e516be7340b7203fe86c6be3ac21f693f42a"
     unmount      = true
 
   }

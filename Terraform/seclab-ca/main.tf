@@ -5,17 +5,16 @@ terraform {
       version = "0.71.0"
     }
     keepass = {
-      source = "iSchluff/keepass"
+      source  = "iSchluff/keepass"
       version = "1.0.1"
     }
   }
 }
 
 variable "keepass_password" {
-  type       = string
-  sensitive  = true
-  ephemeral  = true
-
+  type      = string
+  sensitive = true
+  ephemeral = true
 }
 
 variable "keepass_database" {
@@ -37,7 +36,13 @@ variable "proxmox_node" {
 
 variable "hostname" {
   type        = string
-  default     = "siem"
+  default     = "smallstep"
+  description = "hostname"
+}
+
+variable "vm_name" {
+  type        = string
+  default     = "seclab-ca"
   description = "hostname"
 }
 
@@ -67,8 +72,9 @@ provider "proxmox" {
   api_token = "${data.keepass_entry.proxmox_api.username}=${data.keepass_entry.proxmox_api.password}"
 }
 
-resource "proxmox_virtual_environment_vm" "seclab-siem" {
-  name      = "Seclab-Siem"
+
+resource "proxmox_virtual_environment_vm" "seclab-ca" {
+  name      = "Seclab-CA"
   node_name = var.proxmox_node
   on_boot   = true
 
@@ -82,12 +88,11 @@ resource "proxmox_virtual_environment_vm" "seclab-siem" {
   }
 
   cpu {
-    type = "host"
-    cores = 4
+    cores = 2
   }
 
   memory {
-    dedicated = 8192
+    dedicated = 4096
   }
 
   network_device {
@@ -101,25 +106,11 @@ resource "proxmox_virtual_environment_vm" "seclab-siem" {
     password = data.keepass_entry.seclab_user.password
     host     = self.ipv4_addresses[1][0]
   }
-  
-  provisioner "file" {
-    source      = "./00-netplan.yaml"
-    destination = "/tmp/00-netplan.yaml"
-  }
-
-  provisioner "file" {
-    source      = "../../pki/root_ca.crt"
-    destination = "/tmp/seclab.crt"
-  }
 
   provisioner "remote-exec" {
     inline = [
-      "sudo rm /etc/netplan/*.yaml",
-      "sudo mv /tmp/00-netplan.yaml /etc/netplan/00-netplan.yaml",
-      "sudo cp /tmp/seclab.crt /usr/local/share/ca-certificates",
-      "sudo update-ca-certificates",
       "sudo hostnamectl hostname ${var.hostname}",
-      "sudo netplan apply && sudo ip addr add dev enp6s18 ${self.ipv4_addresses[1][0]}",
+      "sudo netplan apply",
       "ip a s"
     ]
   }
@@ -128,7 +119,7 @@ resource "proxmox_virtual_environment_vm" "seclab-siem" {
 }
 
 output "vm_ip" {
-  value       = proxmox_virtual_environment_vm.seclab-siem.ipv4_addresses
+  value       = proxmox_virtual_environment_vm.seclab-ca.ipv4_addresses
   sensitive   = false
   description = "VM IP"
 }

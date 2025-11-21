@@ -1,0 +1,160 @@
+---
+- name: Gather facts if needed
+  ansible.builtin.setup:
+  when: ansible_os_family is not defined
+#
+#- name: Check for Windows
+#  ansible.builtin.fail:
+#    msg: Flare VM only supports Windows
+#  when: ansible_os_family != "Windows"
+#
+#- name: Get Windows version
+#  ansible.windows.win_shell: |
+#    $os = Get-CimInstance -ClassName Win32_OperatingSystem
+#    $version = [System.Version]$os.Version
+#    $versionString = "$($version.Major).$($version.Minor)"
+#    Write-Output $versionString
+#  register: win_version_output
+#
+#- name: Ensure host is >= Windows 10
+#  ansible.builtin.assert:
+#    that: (win_version_output.stdout | trim) is version_compare('10', '>')
+#    fail_msg: "Host is not running Windows 10 or newer"
+#    success_msg: "Host is running Windows {{ win_version_output.stdout | trim }}"
+#
+#- name: Get PowerShell version
+#  ansible.windows.win_shell: $PSVersionTable.PSVersion.Major
+#  register: ps_version_output
+#
+#- name: Ensure host is >= Windows 10
+#  ansible.builtin.assert:
+#    that: (ps_version_output.stdout | trim) is version_compare('5', '>=')
+#    fail_msg: "Host is not running Powershell 5 or newer"
+#    success_msg: "Host is running Powershell {{ ps_version_output.stdout | trim }}"
+#
+
+## win_disk_facts is a very new module, and users may not have it, so we'll do the disk work with some powershell and regex
+# - name: Retrieve disk facts
+#   ansible.windows.win_disk_facts:
+#   register: disk_facts
+
+# - name: Ensure disk capacity is at least 60 GB
+#   ansible.builtin.assert:
+#     that: disk_facts.disks.C.SizeTotal > 60 * 1024 * 1024 * 1024
+#     fail_msg: "Disk capacity is insufficient (< 60 GB)"
+#     success_msg: "Disk capacity is sufficient (>= 60 GB)"
+
+- name: Retrieve disk capacity using PowerShell
+  ansible.windows.win_shell: Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID, @{Name="SizeTotal";Expression={[math]::Round($_.Size, 2)}}
+  register: disk_capacity
+
+- name: Show Disk size output
+  ansible.builtin.debug:
+    var: disk_capacity.stdout_lines
+
+- name: Parse disk capacity information
+  ansible.builtin.set_fact:
+    # "I want to sit down and just chop it up, Benihana"
+    # Take all lines after the first 3, select only non-blank lines, use regex to extract the drive name and size, split those on the space and return the list
+    disk_capacity_info: "{{ disk_capacity.stdout_lines[3:] | select() | map('regex_replace', '^(\\S+)\\s+(\\d+)$', '\\1 \\2') | map('split', ' ') | list }}"
+
+- name: Show bytes of first non-zero size Disk
+  ansible.builtin.debug:
+    # Grab the first disk with size > 0 and extract it's value in bytes
+    msg: "{{ (disk_capacity_info | selectattr('1', 'gt', '0'))[0][1] }}"
+
+- name: Ensure disk capacity is at least 60 GB
+  ansible.builtin.assert:
+    that: ((disk_capacity_info | selectattr('1', 'gt', '0'))[0][1] | int) > (60 * 1024 * 1024 * 1024)
+    fail_msg: "Disk capacity is insufficient (< 60 GB)"
+    success_msg: "Disk capacity is sufficient (>= 60 GB)"
+
+- name: Retrieve memory size
+  ansible.windows.win_shell: (Get-WmiObject -Class Win32_OperatingSystem).TotalVisibleMemorySize
+  register: memory_size_output
+
+- name: Ensure memory is at least 2 GB
+  ansible.builtin.assert:
+    that: memory_size_output.stdout | int > (2 * 1024 * 1024)
+    fail_msg: "Memory is insufficient (< 2 GB)"
+    success_msg: "Memory is sufficient (>= 2 GB)"
+
+- name: Retrieve user account names
+  ansible.windows.win_shell: Get-WmiObject Win32_UserAccount | Select-Object -ExpandProperty Name
+  register: user_accounts_output
+
+- name: Show user account names
+  ansible.builtin.debug:
+    var: user_accounts_output.stdout_lines
+
+- name: Check if user account names have spaces or special characters
+  ansible.builtin.assert:
+    that: (user_accounts_output.stdout_lines | select('search', '^[a-zA-Z0-9_]+$') | list | length) == (user_accounts_output.stdout_lines | length)
+    fail_msg: "User account names contain spaces or special characters."
+    success_msg: "User account names are valid."
+
+- name: Verify internet connectivity
+  ansible.windows.win_wait_for:
+    host: boxstarter.org
+    port: 443
+    state: started
+    delay: 0
+    timeout: 2
+
+- name: Disable Windows Updates
+  ansible.builtin.script:
+    cmd: disable_updates.ps1
+
+- name: Disable Defender 1
+  ansible.windows.win_powershell:
+    script: |
+      Add-MpPreference -ExclusionPath 'C:\'
+
+- name: Execute PowerShell script to check tamper protection status
+  ansible.windows.win_shell: |
+    (Get-MpComputerStatus).IsTamperProtected
+  register: tamper_protection_result
+
+- name: Set fact based on tamper protection status
+  ansible.builtin.set_fact:
+    tamper_protection_enabled: "{{ true if 'True' in tamper_protection_result.stdout else false }}"
+
+- name: Disable Defender 2
+  ansible.builtin.script:
+    cmd: disable_defender.bat
+  register: disable_defender
+  when: tamper_protection_enabled
+
+- name: Reboot after disabling Defender
+  ansible.windows.win_reboot:
+  when: tamper_protection_enabled
+
+- name: Download FlareVM
+  ansible.windows.win_get_url:
+    url: https://raw.githubusercontent.com/mandiant/flare-vm/main/install.ps1
+    dest: "C:\\Users\\{{ ansible_user }}\\Downloads\\flare-install.ps1"
+
+- name: Unblock Install Script
+  ansible.windows.win_powershell:
+    script: |
+      Unblock-File -Path 'C:\Users\{{ ansible_user }}\Downloads\\flare-install.ps1'
+
+- name: Set PowerShell Execution Policy to Unrestricted
+  ansible.windows.win_powershell:
+    script: |
+      Set-ExecutionPolicy -ExecutionPolicy Unrestricted -Force
+
+- name: Run the Flare installer script
+  ansible.windows.win_shell: ".\\flare-install.ps1 -noPassword -noWait -noGui -noChecks"
+  args:
+    chdir: "C:\\Users\\{{ ansible_user }}\\Downloads\\"
+  async: 100
+  poll: 0
+
+- name: Wait till its done - This will take a long time
+  ansible.builtin.include_tasks:
+    file: wait_for_flare.yml
+
+- name: Success
+  ansible.builtin.debug:
+    msg: "FlareVM install has finished. Check the VM for a log of any packages that had errors."

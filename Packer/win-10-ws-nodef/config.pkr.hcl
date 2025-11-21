@@ -16,14 +16,14 @@ variable "keepass_database" {
   default = "../../seclab.kdbx"
 }
 
+variable "ca_cert_path" {
+  type = string
+  default = "../../pki/root_ca.crt"
+}
+
 variable "keepass_password" {
   type = string
   sensitive = true
-}
-
-variable "ca_cert_path" {
-  type = string
-  default = "../../pki/ca.crt"
 }
 
 data "keepass-credentials" "kpxc" {
@@ -33,17 +33,12 @@ data "keepass-credentials" "kpxc" {
 
 variable "hostname" {
   type    = string
-  default = "win-server-22"
+  default = "win10-ws"
 }
 
 variable "proxmox_api_host" {
   type    = string
   default = "proxmox"
-}
-
-variable "proxmox_node" {
-  type    = string
-  default = "pve"
 }
 
 variable "storage_pool" {
@@ -68,31 +63,36 @@ locals {
   proxmox_api_token = data.keepass-credentials.kpxc.map["/Passwords/Seclab/proxmox_api-Password"]
 }
 
-source "proxmox-iso" "seclab-win-server" {
-  proxmox_url              = "https://${var.proxmox_api_host}:8006/api2/json"
-  node                     = "${var.proxmox_node}"
-  username                 = "${local.proxmox_api_id}"
-  token                    = "${local.proxmox_api_token}"
+variable "proxmox_node" {
+  type    = string
+  default = "pve"
+}
+
+source "proxmox-iso" "seclab-win-ws" {
+  proxmox_url  = "https://${var.proxmox_api_host}:8006/api2/json"
+  node         = "${var.proxmox_node}"
+  username     = "${local.proxmox_api_id}"
+  token        = "${local.proxmox_api_token}"
   boot_iso {
     type         = "sata"
-    iso_file                 = "${var.iso_storage}:iso/winserver-2022.iso"
-    iso_checksum             = "sha256:3e4fa6d8507b554856fc9ca6079cc402df11a8b79344871669f0251535255325"
+    iso_file     = "${var.iso_storage}:iso/win10-22H2.iso"
+    iso_checksum = "sha256:ef7312733a9f5d7d51cfa04ac497671995674ca5e1058d5164d6028f0938d668"
     unmount      = true
   }
-  insecure_skip_tls_verify = true
-  machine                  = "pc-q35-9.0"
-  cpu_type                 = "x86-64-v2-AES"
+  /*skip_export             = true*/
   communicator             = "ssh"
   ssh_username             = "${local.username}"
   ssh_password             = "${local.password}"
-  ssh_timeout              = "30m"
+  ssh_timeout              = "60m"
   qemu_agent               = true
-  cores                    = 4
-  memory                   = 8192
-  vm_name                  = "seclab-win-server-22"
-  template_description     = "Base Seclab Windows Server 2022"
-  os                       = "win11"
-  bios                     = "ovmf"
+  cores                    = 2
+  memory                   = 4096
+  vm_name                  = "seclab-win10-ws-nodef"
+  template_description     = "Base Seclab Windows Workstation with no Defender"
+  os                       = "win10"
+  insecure_skip_tls_verify = true
+  machine                  = "pc-q35-9.0"
+  cpu_type                 = "x86-64-v2-AES"
   boot                     = "order=sata0;virtio0"
   boot_wait                = "5s"
   boot_command             = [
@@ -101,8 +101,9 @@ source "proxmox-iso" "seclab-win-server" {
     "<space><space><space><space><space><space>",
     "<space><space><space><space><space><space>",
     "<space><space><space><space><space><space>",
-    "<wait60s><enter>"
+    "<wait30s><enter>"
   ]
+
   efi_config {
     efi_storage_pool  = "${var.storage_pool}"
     efi_type          = "4m"
@@ -116,10 +117,9 @@ source "proxmox-iso" "seclab-win-server" {
   additional_iso_files {
     index        = 1
     type         = "sata"
-    iso_file     = "${var.iso_storage}:iso/Autounattend-win-server-2022.iso"
-    iso_checksum = "sha256:17523920819b80cb3f9521d98aa974144e05432cbf91c85a9c4e2dd2247358ea"
+    iso_file     = "${var.iso_storage}:iso/Autounattend-win-10-ws-nd.iso"
+    iso_checksum = "sha256:d897f23923c7e9f8c70b869974a3c3a0dc1951079cc39d58b4b2940a44ca50a8"
   }
-  
   additional_iso_files {
     index        = 2
     type         = "sata"
@@ -133,16 +133,16 @@ source "proxmox-iso" "seclab-win-server" {
 
   disks {
     type         = "virtio"
-    disk_size    = "60G"
+    disk_size    = "100G"
     storage_pool = "${var.storage_pool}"
     format       = "raw"
   }
-  scsi_controller = "virtio-scsi-single"
+  scsi_controller = "virtio-scsi-pci"
+
 }
 
-
 build {
-  sources = ["sources.proxmox-iso.seclab-win-server"]
+  sources = ["sources.proxmox-iso.seclab-win-ws"]
   provisioner "file" {
     source = "${var.ca_cert_path}"
     destination = "C:/Windows/Temp/ca.crt"

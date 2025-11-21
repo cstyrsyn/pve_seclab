@@ -1,0 +1,34 @@
+- name: Recusively loop to check if Flare is done
+  block:
+    - name: Increment the retry count
+      ansible.builtin.set_fact:
+        retry_count: "{{ 0 if retry_count is undefined else retry_count | int + 1 }}"
+
+    - name: Wait for the host's control interface (WinRM via HTTPS) to come up
+      ansible.builtin.wait_for:
+        host: "{{ ansible_host }}"
+        port: 5986
+        delay: 3
+        state: started
+      delegate_to: localhost
+
+    - name: Wait till its done - This will take a long time
+      ansible.windows.win_wait_for:
+        path: C:\ProgramData\chocolatey\bin\yara.exe
+        state: present
+        timeout: 7200
+        sleep: 60
+
+  rescue:
+    - name: Check if maximum retries reached
+      ansible.builtin.fail:
+        msg: "Maximum retries ({{ retry_count }}) reached"
+      when: retry_count | int == 5
+
+    - name: Don't give up quite yet
+      ansible.builtin.debug:
+        msg: "Wait for failed, let's give it another shot"
+
+    - name: A little recursion never hurt...
+      ansible.builtin.include_tasks:
+        file: wait_for_flare.yml

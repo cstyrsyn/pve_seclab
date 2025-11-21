@@ -38,17 +38,22 @@ variable "proxmox_api_host" {
 
 variable "proxmox_node" {
   type    = string
-  default = "proxmox"
+  default = "pve"
 }
 
-variable "storage_pool" {
+variable "proxmox_host" {
   type    = string
-  default = "local-lvm"
+  default = "proxmox"
 }
 
 variable "iso_storage" {
   type    = string
-  default = "local"
+  default = "store"
+}
+
+variable "storage_pool" {
+  type    = string
+  default = "main"
 }
 
 variable "network_adapter" {
@@ -76,8 +81,8 @@ source "proxmox-iso" "seclab-ubuntu-server" {
   token       = "${local.proxmox_api_token}"
   boot_iso {
     type         = "scsi"
-    iso_file     = "${var.iso_storage}:iso/ubuntu-24.04.1-live-server-amd64.iso"
-    iso_checksum = "sha256:e240e4b801f7bb68c20d1356b60968ad0c33a41d00d828e74ceb3364a0317be9"
+    iso_file     = "${var.iso_storage}:iso/ubuntu-24.04.3-live-server-amd64.iso"
+    iso_checksum = "sha256:c3514bf0056180d09376462a7a1b4f213c1d6e8ea67fae5c25099c6fd3d8274b"
     unmount      = true
   }
   ssh_username             = "${local.username}"

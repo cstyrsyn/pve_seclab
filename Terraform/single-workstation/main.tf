@@ -25,6 +25,12 @@ variable "keepass_database" {
 variable "proxmox_host" {
   type        = string
   default     = "proxmox"
+  description = "Proxmox host name"
+}
+
+variable "proxmox_node" {
+  type        = string
+  default     = "pve"
   description = "Proxmox node name"
 }
 
@@ -37,6 +43,19 @@ variable "hostname" {
 variable "template_id" {
   type        = string
   description = "Template ID for clone"
+  default = "108"
+}
+
+variable "vm_name" {
+  type        = string
+  description = "VM Name"
+  default = "Seclab-Workstation"
+}
+
+variable "disk_size" {
+  type = number
+  description = "disk size"
+  default = 80
 }
 
 provider "keepass" {
@@ -60,8 +79,8 @@ provider "proxmox" {
 }
 
 resource "proxmox_virtual_environment_vm" "seclab-ws" {
-  name      = "Seclab-Workstation"
-  node_name = var.proxmox_host
+  name      = var.vm_name
+  node_name = var.proxmox_node
   on_boot   = true
 
   clone {
@@ -79,7 +98,7 @@ resource "proxmox_virtual_environment_vm" "seclab-ws" {
   }
 
   memory {
-    dedicated = 4096
+    dedicated = 8192
   }
 
   network_device {
